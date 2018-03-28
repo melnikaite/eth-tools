@@ -1,0 +1,42 @@
+<script src="web3.min.js"></script>
+<script>
+  const web3 = new Web3();
+  decodeTransaction = () => {
+    document.querySelector('#result').innerText = '';
+    const abi = JSON.parse(document.querySelector('#abi').value);
+    const functionsAbi = abi.filter(item => item.type === 'function').map(item => {
+      item.signature = web3.eth.abi.encodeFunctionSignature(item);
+      return item;
+    });
+    const input = document.querySelector('#input').value;
+    const functionAbi = functionsAbi.find(item => input.indexOf(item.signature) === 0);
+    if (functionAbi) {
+      const functionName = functionAbi.name;
+      let functionArgs;
+      try {
+        functionArgs = web3.eth.abi.decodeParameters(functionAbi.inputs, input);
+        delete functionArgs.__length__;
+      } catch (e) {
+        console.error(e);
+      }
+      document.querySelector('#result').innerText = JSON.stringify({
+        functionName: functionName,
+        functionArgs: functionArgs,
+      }, null, 4);
+    }
+  }
+</script>
+<style>
+  textarea {
+    width: 100%;
+    height: 100px;
+  }
+</style>
+<h1>Decode Ethereum Transaction Online</h1>
+ABI <textarea id="abi" placeholder='[{"inputs": [{"name": "_to", "type": "address"}, {"name": "_amount", "type": "uint256"}], "name": "transfer", "type": "function"}]'></textarea>
+<br>
+Input <textarea id="input" placeholder="0xa9059cbb0000000000000000abcdef0123456789abcdef0123456789abcdef011"></textarea>
+<br>
+<button onclick="decodeTransaction()">Decode</button>
+<pre id="result"></pre>
+* web3 can't decode strings, use bytes32 instead

@@ -1,0 +1,37 @@
+<script src="web3.min.js"></script>
+<script>
+  const web3 = new Web3();
+  decodeEvent = () => {
+    document.querySelector('#result').innerText = '';
+    const abi = JSON.parse(document.querySelector('#abi').value);
+    const eventsAbi = abi.filter(item => item.type === 'event').map(item => {
+      item.signature = web3.eth.abi.encodeEventSignature(item);
+      return item;
+    });
+    const data = document.querySelector('#data').value;
+    const topics = JSON.parse(document.querySelector('#topics').value);
+    const eventAbi = eventsAbi.find(item => item.signature === topics[0]);
+    const eventName = eventAbi.name;
+    const eventArgs = web3.eth.abi.decodeLog(eventAbi.inputs, data, topics);
+    delete eventArgs.__length__;
+    document.querySelector('#result').innerText = JSON.stringify({
+      eventName: eventName,
+      eventArgs: eventArgs,
+    }, null, 4);
+  }
+</script>
+<style>
+  textarea {
+    width: 100%;
+    height: 100px;
+  }
+</style>
+<h1>Decode Ethereum Event Log Online</h1>
+ABI <textarea id="abi" placeholder='[{"inputs":[{"indexed":true,"name":"_from","type":"address"},{"indexed":true,"name":"_to","type":"address"},{"indexed":false,"name":"_value","type":"uint256"}],"name":"Transfer","type":"event"}]'></textarea>
+<br>
+Data <textarea id="data" placeholder="0x0000000000000000000000000000000000000000000000000000000000000001"></textarea>
+<br>
+Topics <textarea id="topics" placeholder='["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef","0x000000000000000000000000abcdef0123456789abcdef0123456789abcdef01","0x000000000000000000000000c4193bf3b35af5972a0f75accea5001f18bba06a"]'></textarea>
+<br>
+<button onclick="decodeEvent()">Decode</button>
+<pre id="result"></pre>

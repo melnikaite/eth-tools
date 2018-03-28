@@ -1,0 +1,33 @@
+<script src="moment.min.js"></script>
+<script>
+  moment().utc();
+
+  calculate = () => {
+    document.querySelector('#result').innerText = '';
+
+    const operation = document.querySelector('#operation').value;
+    const value = document.querySelector('#value').value;
+    const unit = document.querySelector('#unit').value;
+
+    const result = moment()[operation](value, unit);
+
+    document.querySelector('#result').innerText = result.format('X');
+  }
+</script>
+<h1>Generate Timestamp using Solidity Time Units Online</h1>
+Current
+<select id="operation">
+  <option>add</option>
+  <option>subtract</option>
+</select>
+<input type="number" id="value">
+<select id="unit">
+  <option>seconds</option>
+  <option>minutes</option>
+  <option>hours</option>
+  <option>days</option>
+  <option>weeks</option>
+  <option>years</option>
+</select>
+<button onclick="calculate()">Calculate</button>
+<pre id="result"></pre>
