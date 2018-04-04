@@ -12,7 +12,7 @@
     const topics = JSON.parse(document.querySelector('#topics').value);
     const eventAbi = eventsAbi.find(item => item.signature === topics[0]);
     const eventName = eventAbi.name;
-    const eventArgs = web3.eth.abi.decodeLog(eventAbi.inputs, data, topics);
+    const eventArgs = web3.eth.abi.decodeLog(eventAbi.inputs, data, topics.slice(1));
     delete eventArgs.__length__;
     document.querySelector('#result').innerText = JSON.stringify({
       eventName: eventName,
