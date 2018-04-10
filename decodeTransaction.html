@@ -14,7 +14,7 @@
       const functionName = functionAbi.name;
       let functionArgs;
       try {
-        functionArgs = web3.eth.abi.decodeParameters(functionAbi.inputs, input);
+        functionArgs = web3.eth.abi.decodeParameters(functionAbi.inputs, input.slice(10));
         delete functionArgs.__length__;
       } catch (e) {
         console.error(e);
