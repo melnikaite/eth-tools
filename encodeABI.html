@@ -1,0 +1,28 @@
+<script src="web3.min.js"></script>
+<script>
+  const web3 = new Web3();
+  encodeABI = () => {
+    document.querySelector('#result').innerText = '';
+    const abi = JSON.parse(document.querySelector('#abi').value);
+    const method = document.querySelector('#method').value;
+    const contract = new web3.eth.Contract(abi);
+    const arguments = JSON.parse(document.querySelector('#arguments').value);
+    const data = contract.methods[method](...arguments).encodeABI();
+    document.querySelector('#result').innerText = data;
+  }
+</script>
+<style>
+  textarea {
+    width: 100%;
+    height: 100px;
+  }
+</style>
+<h1>Encode ABI Online</h1>
+ABI <textarea id="abi" placeholder='[{"constant":false,"inputs":[{"name":"_required","type":"uint256"}],"name":"changeRequirement","outputs":[],"payable":false,"type":"function"}]'></textarea>
+<br>
+Method <input id="method" placeholder='changeRequirement'/>
+<br>
+Arguments <textarea id="arguments" placeholder='[1]'></textarea>
+<br>
+<button onclick="encodeABI()">Encode</button>
+<pre id="result"></pre>
