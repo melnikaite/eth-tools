@@ -1,0 +1,56 @@
+<script src="web3.min.js"></script>
+<script src="decimal.min.js"></script>
+<script>
+  window.addEventListener('load', () => {
+    if (typeof web3 !== 'undefined') {
+      web3 = new Web3(web3.currentProvider);
+      web3.eth.getAccounts().then(accounts => {
+        if (accounts[0]) {
+          document.querySelector('#from').value = accounts[0];
+        } else {
+          document.querySelector('#result').innerText = 'Unlock MetaMask';
+        }
+      });
+    } else {
+      document.querySelector('#result').innerText = 'Install MetaMask';
+    }
+  });
+  replaceTransaction = () => {
+    document.querySelector('#result').innerText = '';
+    const tx = {
+      from: document.querySelector('#from').value,
+      to: document.querySelector('#to').value,
+      value: Decimal.mul(document.querySelector('#value').value || 0, '1000000000000000000'),
+      gas: document.querySelector('#gas').value ? Decimal(document.querySelector('#gas').value).toHex() : undefined,
+      gasPrice: document.querySelector('#gasPrice').value ? Decimal.mul(document.querySelector('#gasPrice').value, '1000000000') : undefined,
+      data: document.querySelector('#data').value,
+      nonce: Decimal(document.querySelector('#nonce').value || 0).toHex(),
+    };
+    try {
+      web3.eth.sendTransaction(tx)
+        .on('transactionHash', (hash) => {
+          document.querySelector('#result').innerText = hash;
+        }).on('error', (error) => {
+        document.querySelector('#result').innerText = error.message;
+      });
+    } catch (error) {
+      document.querySelector('#result').innerText = error.message;
+    }
+  }
+</script>
+<style>
+  textarea {
+    width: 100%;
+    height: 100px;
+  }
+</style>
+<h1>Replace Ethereum Transaction Online</h1>
+From <input id="from" placeholder="0x39fA8c5f2793459D6622857E7D9FbB4BD91766d3"/><br>
+To <input id="to" placeholder="0xc083e9947Cf02b8FfC7D3090AE9AEA72DF98FD47"/><br>
+Value, ETH <input id="value" placeholder="1"/><br>
+Gas <input id="gas" placeholder="3000000"/><br>
+Gas Price, Gwei <input id="gasPrice" placeholder="100"/><br>
+Data <textarea id="data" placeholder="0x0"></textarea><br>
+Nonce <input id="nonce" placeholder="1"/><br>
+<button onclick="replaceTransaction()">Replace</button>
+<pre id="result"></pre>
