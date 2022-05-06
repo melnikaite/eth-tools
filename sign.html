@@ -1,0 +1,42 @@
+<script src="buffer.min.js"></script>
+<script>
+    window.addEventListener('load', async () => {
+        if (typeof window.ethereum !== 'undefined') {
+            try {
+                await window.ethereum.enable();
+                const accounts = await ethereum.request({
+                    method: 'eth_accounts',
+                });
+                document.querySelector('#from').value = accounts[0];
+            } catch (e) {
+                document.querySelector('#result').innerText = 'Unlock MetaMask';
+            }
+        } else {
+            document.querySelector('#result').innerText = 'Install MetaMask';
+        }
+    });
+    sign = async () => {
+        try {
+            document.querySelector('#result').innerText = '';
+            const from = document.querySelector('#from').value;
+            const data = `0x${Buffer.from(document.querySelector('#data').value, 'utf8').toString('hex')}`;
+            document.querySelector('#result').innerText = await window.ethereum.request({
+                method: 'personal_sign',
+                params: [data, from],
+            });
+        } catch (error) {
+            document.querySelector('#result').innerText = error.message;
+        }
+    };
+</script>
+<style>
+    textarea {
+        width: 100%;
+        height: 100px;
+    }
+</style>
+<h1>Sign Personal Message Ethereum Online</h1>
+From <input id="from" placeholder="0x39fA8c5f2793459D6622857E7D9FbB4BD91766d3"/><br>
+Message <textarea id="data" placeholder="some text"></textarea><br>
+<button onclick="sign()">Sign</button>
+<pre id="result"></pre>

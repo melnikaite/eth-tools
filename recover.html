@@ -1,0 +1,38 @@
+<script>
+    window.addEventListener('load', async () => {
+        if (typeof window.ethereum !== 'undefined') {
+            try {
+                await window.ethereum.enable();
+            } catch (e) {
+                document.querySelector('#result').innerText = 'Unlock MetaMask';
+            }
+        } else {
+            document.querySelector('#result').innerText = 'Install MetaMask';
+        }
+    });
+    verify = async () => {
+        try {
+            document.querySelector('#result').innerText = '';
+            const data = document.querySelector('#data').value;
+            const signature = document.querySelector('#signature').value;
+            const result = await window.ethereum.request({
+                method: 'personal_ecRecover',
+                params: [data, signature],
+            });
+            document.querySelector('#result').innerText = (result);
+        } catch (error) {
+            document.querySelector('#result').innerText = error.message;
+        }
+    };
+</script>
+<style>
+    textarea {
+        width: 100%;
+        height: 100px;
+    }
+</style>
+<h1>Verify Personal Message Ethereum Online</h1>
+Message <textarea id="data" placeholder="some text"></textarea><br>
+Signature <textarea id="signature" placeholder="0x0"></textarea><br>
+<button onclick="verify()">Verify</button>
+<pre id="result"></pre>
