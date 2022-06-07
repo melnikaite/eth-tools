@@ -1,0 +1,13 @@
+<script src="web3.min.js"></script>
+<script>
+  const web3 = new Web3();
+  string2Hex = () => {
+    document.querySelector('#result').innerText = '';
+    const string = document.querySelector('#string').value;
+      document.querySelector('#result').innerText = web3.utils.padLeft(web3.utils.utf8ToHex(string), 64);
+  }
+</script>
+<h1>Convert String to bytes32 hex for Remix Online</h1>
+<label for="string">String: </label><input id="string" />
+<button onclick="string2Hex()">Convert</button><br />
+Result: <pre id="result"></pre>

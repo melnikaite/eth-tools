@@ -1,0 +1,13 @@
+<script src="web3.min.js"></script>
+<script>
+  const web3 = new Web3();
+  hex2String = () => {
+    document.querySelector('#result').innerText = '';
+    const hex = document.querySelector('#hex').value;
+    document.querySelector('#result').innerText = web3.utils.hexToUtf8(hex);
+  }
+</script>
+<h1>Convert Hex to String Ethereum Online</h1>
+<label for="hex">Hex: </label><input id="hex" />
+<button onclick="hex2String()">Convert</button><br />
+Result: <pre id="result"></pre>
