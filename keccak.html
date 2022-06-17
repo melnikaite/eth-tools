@@ -1,0 +1,18 @@
+<script src="web3.min.js"></script>
+<script>
+  const web3 = new Web3();
+  hash = () => {
+    document.querySelector('#result').innerText = '';
+    const arguments = document.querySelector('#arguments').value.split("\n").filter(i => !!i).map(JSON.parse);
+    document.querySelector('#result').innerText = web3.utils.soliditySha3(...arguments);
+  }
+</script>
+<h1>Hash values using solidity keccak Online</h1>
+<label for="arguments">Arguments: </label><br />
+<textarea id="arguments" cols="100" rows="10">
+{"t": "string", "v": "Hello!%"}
+{"t": "int8", "v": -23}
+{"t": "address", "v": "0x85F43D8a49eeB85d32Cf465507DD71d507100C1d"}
+</textarea><br />
+<button onclick="hash()">Hash</button><br />
+Result: <pre id="result"></pre>
