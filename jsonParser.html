@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Universal String to JSON Converter (with cURL --data Extraction & Copy Buttons)</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    textarea { width: 100%; height: 200px; }
+    pre { background: #f4f4f4; padding: 10px; white-space: pre-wrap; }
+    button { padding: 10px 20px; margin: 10px 5px 10px 0; }
+    .error { color: red; font-weight: bold; }
+    .highlight { background-color: yellow; }
+    .section { margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Universal String to JSON Converter</h1>
+  <p>Paste a Python/JS/PHP‑style string or a cURL command here:</p>
+  <textarea id="input" placeholder="E.g.
+curl --location 'http://localhost:8005/api/mind/experimental/cortex/ticket/1051/callback' \
+  --header 'Authorization: Bearer ...' \
+  --header 'Content-Type: application/json' \
+  --data '{ &quot;key&quot;: &quot;value with a quote: '\''contractId&quot; }'"></textarea>
+  <br>
+  <button id="convert">Convert</button>
+
+  <div id="candidateSection" class="section">
+    <h2>Candidate Conversion (after fixes):</h2>
+    <pre id="conversionOutput"></pre>
+    <button id="copyCandidate">Copy Candidate</button>
+  </div>
+  
+  <div id="parsedSection" class="section">
+    <h2>Parsed JSON (if valid):</h2>
+    <pre id="jsonOutput"></pre>
+    <button id="copyJson">Copy JSON</button>
+  </div>
+  
+  <div id="errorOutput" class="error"></div>
+
+  <script>
+    // Escapes HTML special characters for safe display.
+    function escapeHtml(text) {
+      var map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      };
+      return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+
+    // Returns a regex-escaped version of the given string.
+    function escapeRegExp(string) {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // Highlights all occurrences of a token in the given string.
+    function highlightAllOccurrences(str, token) {
+      const regex = new RegExp(escapeRegExp(token), 'g');
+      return escapeHtml(str).replace(regex, '<span class="highlight">' + escapeHtml(token) + '</span>');
+    }
+
+    // Highlights a single position (if known) in the given string.
+    function highlightErrorPosition(str, pos) {
+      if (pos === null || pos < 0 || pos >= str.length) {
+        return escapeHtml(str);
+      }
+      let before = str.slice(0, pos);
+      let errorChar = str.charAt(pos);
+      let after = str.slice(pos + 1);
+      return escapeHtml(before) +
+             '<span class="highlight">' + escapeHtml(errorChar) + '</span>' +
+             escapeHtml(after);
+    }
+
+    /**
+     * extractCurlData(input)
+     * 
+     * If the input appears to be a curl command, this function extracts the complete
+     * value of the --data (or --data-binary) argument.
+     *
+     * This custom parser handles the common shell quoting trick for embedding a single quote:
+     *  ' ... '\'' ... '
+     *
+     * Returns the extracted data string or null if not found.
+     */
+    function extractCurlData(input) {
+      // Look for --data or --data-binary followed by whitespace.
+      const dataFlagRegex = /--data(?:-binary)?\s+/i;
+      const flagMatch = dataFlagRegex.exec(input);
+      if (!flagMatch) return null;
+      
+      // Find the index immediately after the flag.
+      let index = flagMatch.index + flagMatch[0].length;
+      
+      // Skip any extra whitespace.
+      while (index < input.length && /\s/.test(input[index])) {
+        index++;
+      }
+      if (index >= input.length) return null;
+      
+      // Check if the data is quoted.
+      const quote = input[index];
+      if (quote !== "'" && quote !== '"') {
+        // Not quoted; extract until next whitespace.
+        let endIndex = input.indexOf(" ", index);
+        if (endIndex === -1) endIndex = input.length;
+        return input.substring(index, endIndex);
+      }
+      
+      // Otherwise, parse a quoted string.
+      let data = "";
+      index++; // Skip the opening quote.
+      while (index < input.length) {
+        const char = input[index];
+        if (char === quote) {
+          // For single-quoted strings in shells, to embed a single quote one writes: '\'' 
+          // Check for that pattern.
+          if (quote === "'" && input.substr(index, 4) === "'\\''") {
+            data += "'";
+            index += 4;
+            continue;
+          } else {
+            // End of quoted string.
+            index++;
+            break;
+          }
+        } else {
+          data += char;
+          index++;
+        }
+      }
+      return data;
+    }
+
+    /**
+     * smartConvert(input)
+     *
+     * 1. Tokenizes string literals (both single‑ and double‑quoted) so inner quotes are preserved.
+     * 2. Replaces Python-style values (None, True, False) with JSON equivalents.
+     * 3. Reinserts the tokenized strings as proper JSON strings.
+     * 4. Quotes unquoted object keys.
+     * 5. Converts enum-like tokens (e.g. <ResponseCaseResultType.TEXT: 'text'>) to just "text".
+     */
+    function smartConvert(input) {
+      let tokens = [];
+      let placeholderCounter = 0;
+      // Regex to match both single and double quoted string literals.
+      const tokenRegex = /('((?:\\.|[^\\'])*)')|("((?:\\.|[^"\\])*)")/g;
+
+      // Replace all string literals with placeholders.
+      let replaced = input.replace(tokenRegex, function(match, g1, g2, g3, g4) {
+        let content = (g2 !== undefined) ? g2 : g4;
+        let placeholder = "__STR_PLACEHOLDER_" + (placeholderCounter++) + "__";
+        tokens.push({ placeholder, content, original: match });
+        return placeholder;
+      });
+
+      // Replace Python-style values.
+      replaced = replaced.replace(/\bNone\b/g, "null")
+                         .replace(/\bTrue\b/g, "true")
+                         .replace(/\bFalse\b/g, "false");
+
+      // Reinstate tokenized string literals as proper JSON strings.
+      tokens.forEach(function(token) {
+        let jsonString = JSON.stringify(token.content);
+        replaced = replaced.split(token.placeholder).join(jsonString);
+      });
+
+      // Quote unquoted object keys.
+      replaced = replaced.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)/g, '$1"$2"$3');
+
+      // Convert enum-like tokens of the form:
+      //    <ResponseCaseResultType.TEXT: "text">
+      // into just "text".
+      replaced = replaced.replace(/<[^>]+:\s*(".*?")\s*>/g, '$1');
+
+      return replaced;
+    }
+
+    /**
+     * convertToJson(inputStr)
+     *
+     * Returns an object with:
+     * - success: true/false
+     * - json: parsed JSON (if successful)
+     * - conversion: candidate conversion string
+     * - errorMsg: error message (if any)
+     * - errorPos: error position (if available)
+     * - highlightedConversion: candidate conversion with all occurrences of the unexpected token highlighted (if applicable)
+     */
+    function convertToJson(inputStr) {
+      // If the input appears to be a curl command, try to extract the --data argument.
+      if (/curl/i.test(inputStr)) {
+        const curlData = extractCurlData(inputStr);
+        if (curlData !== null) {
+          inputStr = curlData;
+        }
+      }
+
+      let candidate = smartConvert(inputStr);
+
+      try {
+        let obj = JSON.parse(candidate);
+        return {
+          success: true,
+          json: JSON.stringify(obj, null, 2),
+          conversion: candidate
+        };
+      } catch (error) {
+        let errorMsg = error.message;
+        let errorPos = null;
+        let highlightedConversion = null;
+
+        // Try to extract "at position" info (case-insensitive).
+        let posMatch = errorMsg.match(/at position (\d+)/i);
+        if (posMatch && posMatch[1]) {
+          errorPos = parseInt(posMatch[1], 10);
+        } else {
+          // Fallback: try to extract the unexpected token.
+          let tokenMatch = errorMsg.match(/Unexpected token\s+(?:"([^"]+)"|'([^']+)'|([^ ,]+))/i);
+          if (tokenMatch) {
+            let token = tokenMatch[1] || tokenMatch[2] || tokenMatch[3];
+            if (token) {
+              highlightedConversion = highlightAllOccurrences(candidate, token);
+            }
+          }
+        }
+        return {
+          success: false,
+          errorMsg: errorMsg,
+          errorPos: errorPos,
+          conversion: candidate,
+          highlightedConversion: highlightedConversion
+        };
+      }
+    }
+
+    // On button click, perform conversion and update the display.
+    document.getElementById("convert").addEventListener("click", function() {
+      const input = document.getElementById("input").value;
+      const result = convertToJson(input);
+
+      if (result.success) {
+        // If valid, hide the candidate conversion section and show parsed JSON.
+        document.getElementById("candidateSection").style.display = "none";
+        document.getElementById("jsonOutput").textContent = result.json;
+        document.getElementById("errorOutput").textContent = "";
+      } else {
+        // If not valid, show candidate conversion with highlighting.
+        document.getElementById("candidateSection").style.display = "block";
+        if (result.highlightedConversion) {
+          document.getElementById("conversionOutput").innerHTML = result.highlightedConversion;
+        } else if (result.errorPos !== null) {
+          document.getElementById("conversionOutput").innerHTML = highlightErrorPosition(result.conversion, result.errorPos);
+        } else {
+          document.getElementById("conversionOutput").textContent = result.conversion;
+        }
+        document.getElementById("jsonOutput").textContent = "";
+        document.getElementById("errorOutput").textContent = "JSON Parsing Error: " + result.errorMsg;
+      }
+    });
+
+    // Copy candidate conversion to clipboard.
+    document.getElementById("copyCandidate").addEventListener("click", function() {
+      const candidateText = document.getElementById("conversionOutput").textContent;
+      navigator.clipboard.writeText(candidateText).then(function() {
+        alert("Candidate conversion copied to clipboard!");
+      }).catch(function(err) {
+        alert("Failed to copy candidate conversion: " + err);
+      });
+    });
+
+    // Copy parsed JSON to clipboard.
+    document.getElementById("copyJson").addEventListener("click", function() {
+      const jsonText = document.getElementById("jsonOutput").textContent;
+      navigator.clipboard.writeText(jsonText).then(function() {
+        alert("Parsed JSON copied to clipboard!");
+      }).catch(function(err) {
+        alert("Failed to copy parsed JSON: " + err);
+      });
+    });
+  </script>
+</body>
+</html>
